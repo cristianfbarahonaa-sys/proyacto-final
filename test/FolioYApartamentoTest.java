@@ -30,7 +30,6 @@ public class FolioYApartamentoTest {
             LocalDate finBloqueo = LocalDate.of(2026, 12, 23);
 
             apto.bloquearRangoFechas(inicioBloqueo, finBloqueo, "Mantenimiento preventivo de tubería");
-
             assertTrue(apto.estaBloqueadoEnNoche(LocalDate.of(2026, 12, 20)), "La noche del 20 debe estar bloqueada.");
             assertTrue(apto.estaBloqueadoEnNoche(LocalDate.of(2026, 12, 22)), "La noche del 22 debe estar bloqueada.");
             assertFalse(apto.estaBloqueadoEnNoche(LocalDate.of(2026, 12, 23)), "La noche de salida (fin) no se bloquea.");
