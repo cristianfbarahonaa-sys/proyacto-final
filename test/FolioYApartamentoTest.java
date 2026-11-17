@@ -1,9 +1,11 @@
-public class FolioYApartamentoTest {
-    import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Test;
+
 import java.time.LocalDate;
+
 import static org.junit.jupiter.api.Assertions.*;
 
-    class FolioYApartamentoTest {
+public class FolioYApartamentoTest {
+
 
         @Test
         void testFolioCalculoSaldoPendiente() {
@@ -42,4 +44,4 @@ import static org.junit.jupiter.api.Assertions.*;
             assertFalse(apto.estaBloqueadoEnNoche(LocalDate.of(2026, 12, 23)), "La noche de salida (fin) no se bloquea.");
         }
     }
-}
+
