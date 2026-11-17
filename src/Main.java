@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.function.Consumer;
 
 public class Main {
-
+//linea del main
     public static void main(String[] args) {
         Application.launch(VentanaSGA.class, args);
     }
