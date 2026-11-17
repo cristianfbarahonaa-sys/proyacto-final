@@ -25,7 +25,7 @@ public class FolioYApartamentoTest {
 
         @Test
         void testApartamentoBloqueoFechas() {
-            Apartamento apto = new Apartamento("APT-102", "Suite Bosque", 1, 2, "Chimenea", 120000L);
+             Apartamento apto = new Apartamento("APT-102", "Suite Bosque", 1, 2, "Chimenea", 120000L);
             LocalDate inicioBloqueo = LocalDate.of(2026, 12, 20);
             LocalDate finBloqueo = LocalDate.of(2026, 12, 23);
 
