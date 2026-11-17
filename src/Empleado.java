@@ -19,6 +19,6 @@ public class Empleado extends Usuario {
     }
 
     public void setCargo(String cargo) {
-        this.cargo = cargo.toUpperCase();
+        thi.cargo = cargo.toUpperCase();
     }
 }
