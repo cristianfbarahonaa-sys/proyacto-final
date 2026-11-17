@@ -1,5 +1,5 @@
 import java.time.LocalDate;
-
+//cambios
 public class Ocupante extends Persona {
 
     public Ocupante(String nombre, LocalDate fechaNacimiento) {
