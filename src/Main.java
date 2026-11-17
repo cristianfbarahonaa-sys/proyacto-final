@@ -53,9 +53,6 @@ public class Main {
             primaryStage.show();
         }
 
-        // =====================================================================
-        // MÉTODOS AUXILIARES CONECTADOS A TODAS LAS PESTAÑAS
-        // =====================================================================
 
         public void actualizarListas() {
             lvApartamentos.getItems().setAll(sistema.getApartamentos());
