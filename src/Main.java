@@ -164,7 +164,7 @@ public class Main {
             accionesReserva.getChildren().addAll(btnCotizar, btnCrearReserva);
 
             btnCotizar.setOnAction(e -> {
-                try {
+                ry {
                     Apartamento apto = lvApartamentos.getSelectionModel().getSelectedItem();
                     if (apto == null) {
                         throw new IllegalArgumentException("Seleccione un apartamento de la lista.");
