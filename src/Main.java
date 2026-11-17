@@ -255,7 +255,7 @@ public class Main {
             tfMotivoApto.setPromptText("Motivo (obligatorio si Fuera de Servicio) o Novedad");
             Button btnCambiarEstadoApto = new Button("Cambiar Estado Apartamento");
             boxAptoEstado.getChildren().addAll(new Label("Estado Apto Seleccionado:"), cbEstadoApto, tfMotivoApto, btnCambiarEstadoApto);
-//correcion
+
             btnConfirmar.setOnAction(e -> ejecutarAccionReserva(r -> r.cambiarEstado(EstadoReserva.CONFIRMADA, "Confirmada")));
             btnCheckIn.setOnAction(e -> ejecutarAccionReserva(sistema::registrarCheckIn));
             btnCheckOut.setOnAction(e -> ejecutarAccionReserva(sistema::registrarCheckOut));
