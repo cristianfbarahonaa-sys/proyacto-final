@@ -1,5 +1,5 @@
 import java.time.LocalDate;
-
+//cambio del metodo de empleado
 public class Empleado extends Usuario {
     private String cargo; // "RECEPCIONISTA" o "ADMINISTRADOR"
 
