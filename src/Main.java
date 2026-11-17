@@ -53,9 +53,6 @@ public class Main {
             primaryStage.show();
         }
 
-        // =====================================================================
-        // MÉTODOS AUXILIARES CONECTADOS A TODAS LAS PESTAÑAS
-        // =====================================================================
 
         public void actualizarListas() {
             lvApartamentos.getItems().setAll(sistema.getApartamentos());
@@ -164,7 +161,7 @@ public class Main {
             accionesReserva.getChildren().addAll(btnCotizar, btnCrearReserva);
 
             btnCotizar.setOnAction(e -> {
-                ry {
+                try {
                     Apartamento apto = lvApartamentos.getSelectionModel().getSelectedItem();
                     if (apto == null) {
                         throw new IllegalArgumentException("Seleccione un apartamento de la lista.");
