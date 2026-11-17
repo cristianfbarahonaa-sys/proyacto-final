@@ -174,7 +174,7 @@ public class Main {
                         lvOcupantes.getItems().setAll(ocupantesTemp);
                     }
                     taDetalle.setText(sistema.generarDesgloseCotizacion(apto, dpEntrada.getValue(), dpSalida.getValue(), ocupantesTemp));
-                } catc (Exception ex) {
+                } catch  (Exception ex) {
                     mostrarMensaje("Error de Cotización", ex.getMessage());
                 }
             });
