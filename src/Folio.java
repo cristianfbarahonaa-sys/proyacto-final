@@ -3,30 +3,44 @@ import java.util.Collections;
 import java.util.List;
 
 public class Folio {
+    // Encapsulamiento: los movimientos nunca se eliminan ni se modifican
     private final List<MovimientoFolio> movimientos = new ArrayList<>();
 
-    public void agregarCargo(String concepto, long valor) {
-        if (valor <= 0) throw new IllegalArgumentException("El cargo debe ser positivo.");
-        movimientos.add(new MovimientoFolio(concepto, valor, null));
+    public void registrarCargo(String concepto, long monto) {
+        movimientos.add(new MovimientoFolio.Cargo(concepto, monto));
     }
 
-    public void registrarPago(String concepto, long valor, MedioPago medio) {
-        if (valor <= 0) throw new IllegalArgumentException("El pago debe ser positivo.");
-        movimientos.add(new MovimientoFolio(concepto, -valor, medio));
+    public void registrarPago(String concepto, long monto, MedioPago medioPago) {
+        movimientos.add(new MovimientoFolio.Pago(concepto, monto, medioPago));
     }
 
-    public long calcularSaldo() {
-        return movimientos.stream().mapToLong(MovimientoFolio::getMonto).sum();
+    // Regla de negocio: una corrección se registra como un movimiento contrario
+    public void registrarCorreccionDeCargo(String motivo, long monto) {
+        movimientos.add(new MovimientoFolio.Pago("CORRECCIÓN DE CARGO: " + motivo, monto, MedioPago.TRANSFERENCIA));
     }
 
-    public long calcularTotalPagado() {
+    public long calcularTotalCargos() {
         return movimientos.stream()
-                .filter(m -> m.getMonto() < 0)
-                .mapToLong(m -> Math.abs(m.getMonto()))
+                .filter(m -> m instanceof MovimientoFolio.Cargo)
+                .mapToLong(MovimientoFolio::getMonto)
                 .sum();
     }
 
-    // Regla: movimientos inalterables, solo se retorna lista de solo lectura
+    public long calcularTotalPagos() {
+        return movimientos.stream()
+                .filter(m -> m instanceof MovimientoFolio.Pago)
+                .mapToLong(MovimientoFolio::getMonto)
+                .sum();
+    }
+
+    public long calcularSaldoPendiente() {
+        long saldo = 0;
+        for (MovimientoFolio m : movimientos) {
+            saldo = m.aplicarAlSaldo(saldo);
+        }
+        return saldo;
+    }
+
     public List<MovimientoFolio> getMovimientos() {
         return Collections.unmodifiableList(movimientos);
     }

@@ -1,163 +1,240 @@
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.Month;
 import java.time.temporal.ChronoUnit;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
 
 public class SistemaGestionAlojamiento {
     private final List<Apartamento> apartamentos = new ArrayList<>();
-    private final List<Usuario> usuarios = new ArrayList<>();
+    private final List<Huesped> huespedes = new ArrayList<>();
+    private final List<Empleado> empleados = new ArrayList<>();
     private final List<Reserva> reservas = new ArrayList<>();
-    private final List<String> logConflictosCanal = new ArrayList<>();
-    private final Map<LocalDate, Temporada> calendarioTemporadas = new HashMap<>();
+    private final List<String> conflictosCanalExterno = new ArrayList<>();
+    private int consecutivoReservas = 100;
 
     public SistemaGestionAlojamiento() {
-        cargarDatosIniciales();
+        inicializarDatosPrueba();
     }
 
-    private void cargarDatosIniciales() {
-        // Usuarios por defecto para pruebas rápidas
-        usuarios.add(new Empleado("Admin UQ", "1001", LocalDate.of(1985, 5, 10), "admin@uq.edu.co", "1234", true));
-        usuarios.add(new Empleado("Laura Recepción", "1002", LocalDate.of(1995, 8, 20), "recep@uq.edu.co", "1234", false));
-        usuarios.add(new Huesped("Carlos Pérez", "1094888777", LocalDate.of(1990, 3, 15), "3101234567", "carlos@gmail.com", "1234"));
+    private void inicializarDatosPrueba() {
+        apartamentos.add(new Apartamento("APT-101", "Suite Cóndor", 2, 4, "Balcón, vista a las montañas, chimenea", 90000));
+        apartamentos.add(new Apartamento("APT-102", "Loft Palma de Cera", 1, 2, "Jacuzzi, mirador privado", 110000));
+        apartamentos.add(new Apartamento("APT-201", "Familiar Cocora", 3, 6, "Terraza, cocina amplia, chimenea", 85000));
 
-        // Apartamentos iniciales en Salento
-        apartamentos.add(new Apartamento("APT-101", "Mirador del Cocora", 2, 4,
-                List.of("Balcón", "Vista a las montañas"), 80000, 100000, 130000));
-        apartamentos.add(new Apartamento("APT-102", "Suite Cafetera", 1, 2,
-                List.of("Jacuzzi", "Chimenea"), 110000, 140000, 180000));
+        huespedes.add(new Huesped("Juan Pérez", "1094900100", LocalDate.of(1992, 4, 12), "3150001122", "juan@uq.edu.co"));
+        huespedes.add(new Huesped("María Gómez", "1094800200", LocalDate.of(1988, 9, 25), "3109998877", "maria@uq.edu.co"));
 
-        // Configurar algunos días de temporada alta
-        LocalDate hoy = LocalDate.now();
-        calendarioTemporadas.put(hoy.plusDays(2), Temporada.MEDIA);
-        calendarioTemporadas.put(hoy.plusDays(3), Temporada.ALTA);
+        empleados.add(new Empleado("Laura Recepción", "1094111", LocalDate.of(1997, 2, 10), "311222333", "recep@uq.edu.co", "recep", "1234", "RECEPCIONISTA"));
+        empleados.add(new Empleado("Carlos Admin", "1094222", LocalDate.of(1985, 7, 19), "312444555", "admin@uq.edu.co", "admin", "1234", "ADMINISTRADOR"));
     }
 
-    public Temporada obtenerTemporadaFecha(LocalDate fecha) {
-        return calendarioTemporadas.getOrDefault(fecha, Temporada.BAJA);
+    public Temporada determinarTemporada(LocalDate fecha) {
+        Month mes = fecha.getMonth();
+        if (mes == Month.DECEMBER || mes == Month.JANUARY || mes == Month.JUNE || mes == Month.JULY) {
+            return Temporada.ALTA;
+        }
+        int diaSemana = fecha.getDayOfWeek().getValue(); // Viernes (5) y Sábado (6) como temporada media
+        if (diaSemana == 5 || diaSemana == 6) {
+            return Temporada.MEDIA;
+        }
+        return Temporada.BAJA;
     }
 
-    public long cotizarEstancia(Apartamento apt, LocalDate entrada, LocalDate salida, List<Ocupante> ocupantes) {
+    public void validarFechas(LocalDate entrada, LocalDate salida) {
+        if (entrada == null || salida == null) {
+            throw new IllegalArgumentException("Las fechas de entrada y salida son obligatorias.");
+        }
+        if (entrada.isBefore(LocalDate.now())) {
+            throw new IllegalArgumentException("No se permiten reservas con fecha de entrada anterior a hoy.");
+        }
         if (!salida.isAfter(entrada)) {
-            throw new IllegalArgumentException("La fecha de salida debe ser posterior a la de entrada.");
+            throw new IllegalArgumentException("La fecha de salida debe ser posterior a la de entrada (mínimo 1 noche).");
+        }
+    }
+
+    public boolean estaApartamentoDisponible(Apartamento apto, LocalDate entrada, LocalDate salida) {
+        if (apto == null || !apto.isActivo() || apto.getEstadoOperativo() == EstadoApartamento.FUERA_DE_SERVICIO) {
+            return false;
+        }
+        for (LocalDate noche = entrada; noche.isBefore(salida); noche = noche.plusDays(1)) {
+            if (apto.estaBloqueadoEnNoche(noche)) {
+                return false;
+            }
+        }
+        // Regla más importante: sin doble venta sobre reservas activas
+        return reservas.stream()
+                .filter(r -> r.getApartamento().equals(apto) && r.getEstado().esActiva())
+                .noneMatch(r -> r.seSolapaCon(entrada, salida));
+    }
+
+    public List<Apartamento> consultarDisponibles(LocalDate entrada, LocalDate salida, int cantidadPersonas) {
+        validarFechas(entrada, salida);
+        return apartamentos.stream()
+                .filter(Apartamento::isActivo)
+                .filter(a -> a.getCapacidadMaxima() >= cantidadPersonas)
+                .filter(a -> estaApartamentoDisponible(a, entrada, salida))
+                .collect(Collectors.toList());
+    }
+
+    public long calcularValorEstancia(Apartamento apto, LocalDate entrada, LocalDate salida, List<Ocupante> ocupantes) {
+        validarFechas(entrada, salida);
+        if (ocupantes.size() > apto.getCapacidadMaxima()) {
+            throw new IllegalArgumentException("El número de ocupantes (" + ocupantes.size() +
+                    ") supera la capacidad máxima del apartamento (" + apto.getCapacidadMaxima() + ").");
         }
         long personasQuePagan = ocupantes.stream().filter(o -> o.pagaTarifa(entrada)).count();
         long total = 0;
-
-        for (LocalDate fecha = entrada; fecha.isBefore(salida); fecha = fecha.plusDays(1)) {
-            Temporada temp = obtenerTemporadaFecha(fecha);
-            total += apt.getTarifa(temp) * personasQuePagan;
+        for (LocalDate noche = entrada; noche.isBefore(salida); noche = noche.plusDays(1)) {
+            Temporada temp = determinarTemporada(noche);
+            total += apto.obtenerTarifaPorTemporada(temp) * personasQuePagan;
         }
         return total;
     }
 
-    public boolean estaDisponible(Apartamento apt, LocalDate entrada, LocalDate salida) {
-        if (!apt.isActivo() || apt.getEstado() == EstadoApartamento.FUERA_SERVICIO) return false;
-        for (Reserva r : reservas) {
-            if (r.getApartamento().equals(apt) && r.esActiva() && r.comparteNocheCon(entrada, salida)) {
-                return false;
-            }
+    public String generarDesgloseCotizacion(Apartamento apto, LocalDate entrada, LocalDate salida, List<Ocupante> ocupantes) {
+        validarFechas(entrada, salida);
+        long pagan = ocupantes.stream().filter(o -> o.pagaTarifa(entrada)).count();
+        long menores = ocupantes.size() - pagan;
+        StringBuilder sb = new StringBuilder();
+        sb.append("Ocupantes: ").append(ocupantes.size())
+                .append(" (Pagan >=6 años: ").append(pagan).append(" | Menores <6 gratis: ").append(menores).append(")\n");
+
+        long acumulado = 0;
+        for (LocalDate noche = entrada; noche.isBefore(salida); noche = noche.plusDays(1)) {
+            Temporada temp = determinarTemporada(noche);
+            long tarifa = apto.obtenerTarifaPorTemporada(temp);
+            long subtotal = tarifa * pagan;
+            acumulado += subtotal;
+            sb.append(" - Noche ").append(noche).append(" [").append(temp).append("]: $")
+                    .append(tarifa).append(" x ").append(pagan).append(" = $").append(subtotal).append("\n");
         }
-        return true;
+        sb.append("TOTAL ESTANCIA CONGELADO: $").append(acumulado);
+        return sb.toString();
     }
 
-    public Reserva crearReserva(Huesped titular, Apartamento apt, LocalDate entrada, LocalDate salida,
-                                List<Ocupante> ocupantes, CanalReserva canal, String codigoExterno) {
-        if (entrada.isBefore(LocalDate.now())) {
-            throw new IllegalArgumentException("No se permiten reservas con fecha anterior a hoy.");
+    public Reserva crearReserva(CanalReserva canal, String codigoExterno, Apartamento apto, Huesped titular,
+                                List<Ocupante> ocupantes, LocalDate entrada, LocalDate salida) {
+        validarFechas(entrada, salida);
+        if (apto == null || titular == null) {
+            throw new IllegalArgumentException("Debe seleccionar un apartamento y un huésped titular.");
         }
-        if (!salida.isAfter(entrada)) {
-            throw new IllegalArgumentException("Mínimo una noche de estancia.");
+        if (ocupantes == null || ocupantes.isEmpty()) {
+            throw new IllegalArgumentException("Debe registrar al menos un ocupante.");
         }
-        if (ocupantes.size() > apt.getCapacidadMaxima()) {
-            throw new IllegalArgumentException("Se supera la capacidad máxima del apartamento (" + apt.getCapacidadMaxima() + ").");
-        }
-        if (canal == CanalReserva.EXTERNA && codigoExterno != null) {
-            boolean duplicado = reservas.stream().anyMatch(r -> codigoExterno.equals(r.getCodigoExterno()));
-            if (duplicado) throw new IllegalArgumentException("El código externo ya existe.");
-        }
-        if (!estaDisponible(apt, entrada, salida)) {
-            if (canal == CanalReserva.EXTERNA) {
-                logConflictosCanal.add("Conflicto canal externo [" + codigoExterno + "] en " + apt.getCodigo() + " (" + entrada + " a " + salida + ")");
-            }
-            throw new IllegalStateException("El apartamento no está disponible en las fechas seleccionadas (Doble venta evitada).");
+        if (ocupantes.size() > apto.getCapacidadMaxima()) {
+            throw new IllegalArgumentException("Los ocupantes superan la capacidad máxima (" + apto.getCapacidadMaxima() + ").");
         }
 
-        long valorTotal = cotizarEstancia(apt, entrada, salida, ocupantes);
-        String id = "RES-" + (reservas.size() + 1);
-        Reserva nueva = new Reserva(id, codigoExterno, titular, apt, entrada, salida, ocupantes, canal, valorTotal);
+        if (canal == CanalReserva.EXTERNA) {
+            if (codigoExterno == null || codigoExterno.isBlank()) {
+                throw new IllegalArgumentException("El canal EXTERNA exige un código de plataforma externa.");
+            }
+            boolean repetido = reservas.stream()
+                    .filter(r -> r.getCanal() == CanalReserva.EXTERNA && r.getCodigoExterno() != null)
+                    .anyMatch(r -> r.getCodigoExterno().equalsIgnoreCase(codigoExterno.trim()));
+            if (repetido) {
+                throw new IllegalStateException("Ya existe una reserva con el código externo: " + codigoExterno);
+            }
+            if (!estaApartamentoDisponible(apto, entrada, salida)) {
+                String conflicto = "Conflicto Canal Externo [" + codigoExterno + "] en " + apto.getCodigo() +
+                        " (" + entrada + " a " + salida + ")";
+                conflictosCanalExterno.add(conflicto);
+                throw new IllegalStateException("Choque con reserva vigente. Rechazada y registrada como conflicto de canal.");
+            }
+        } else {
+            if (!estaApartamentoDisponible(apto, entrada, salida)) {
+                throw new IllegalStateException("El apartamento " + apto.getCodigo() + " no está disponible en esas fechas.");
+            }
+        }
+
+        long valor = calcularValorEstancia(apto, entrada, salida, ocupantes);
+        String desglose = generarDesgloseCotizacion(apto, entrada, salida, ocupantes);
+        String codigo = "RES-" + (++consecutivoReservas);
+
+        Reserva nueva = new Reserva(codigo, canal, codigoExterno, apto, titular, ocupantes, entrada, salida, valor, desglose);
         reservas.add(nueva);
         return nueva;
     }
 
-    public void registrarPago(Reserva reserva, long monto, MedioPago medio) {
-        reserva.getFolio().registrarPago("Abono de huésped", monto, medio);
-        if (reserva.getEstado() == EstadoReserva.PENDIENTE) {
-            long anticipoRequerido = Math.round(reserva.getValorEstanciaCongelado() * 0.30);
-            if (reserva.getCanal() != CanalReserva.PORTAL || reserva.getFolio().calcularTotalPagado() >= anticipoRequerido) {
-                reserva.cambiarEstado(EstadoReserva.CONFIRMADA);
-            }
+    public void registrarCheckIn(Reserva reserva) {
+        if (reserva.getEstado() != EstadoReserva.CONFIRMADA) {
+            throw new IllegalStateException("Solo se permite Check-In si la reserva está CONFIRMADA.");
         }
-    }
-
-    public void hacerCheckIn(Reserva reserva) {
         if (LocalDate.now().isBefore(reserva.getFechaEntrada())) {
-            throw new IllegalStateException("Aún no es la fecha de entrada.");
+            throw new IllegalStateException("Aún no ha llegado la fecha de entrada (" + reserva.getFechaEntrada() + ").");
         }
-        if (reserva.getApartamento().getEstado() != EstadoApartamento.PREPARADO) {
-            throw new IllegalStateException("El apartamento no está PREPARADO.");
+        Apartamento apto = reserva.getApartamento();
+        if (apto.getEstadoOperativo() != EstadoApartamento.PREPARADO) {
+            throw new IllegalStateException("El apartamento debe estar en estado PREPARADO para hacer Check-In.");
         }
-        if (!reserva.cambiarEstado(EstadoReserva.EN_CURSO)) {
-            throw new IllegalStateException("La reserva debe estar CONFIRMADA para hacer check-in.");
+        LocalDateTime momentoCheckIn = LocalDateTime.of(reserva.getFechaEntrada(), LocalTime.of(15, 0));
+        if (apto.getUltimaSalidaRegistrada() != null &&
+                ChronoUnit.HOURS.between(apto.getUltimaSalidaRegistrada(), momentoCheckIn) < 3) {
+            throw new IllegalStateException("Deben pasar al menos 3 horas de preparación entre la salida (11 a.m.) y la entrada (3 p.m.).");
         }
-        reserva.getApartamento().setEstado(EstadoApartamento.OCUPADO);
+        reserva.cambiarEstado(EstadoReserva.EN_CURSO, "Check-In realizado");
+        apto.cambiarEstado(EstadoApartamento.OCUPADO, "Huéspedes en estancia");
     }
 
-    public void hacerCheckOut(Reserva reserva) {
-        if (!reserva.cambiarEstado(EstadoReserva.FINALIZADA)) {
-            throw new IllegalStateException("Solo se puede hacer check-out a reservas EN_CURSO.");
+    public void registrarCheckOut(Reserva reserva) {
+        if (reserva.getEstado() != EstadoReserva.EN_CURSO) {
+            throw new IllegalStateException("Solo se permite Check-Out de reservas EN_CURSO.");
         }
-        reserva.getApartamento().setEstado(EstadoApartamento.PENDIENTE_PREPARACION);
+        reserva.cambiarEstado(EstadoReserva.FINALIZADA, "Check-Out 11:00 a. m.");
+        Apartamento apto = reserva.getApartamento();
+        apto.setUltimaSalidaRegistrada(LocalDateTime.of(reserva.getFechaSalida(), LocalTime.of(11, 0)));
+        apto.cambiarEstado(EstadoApartamento.PENDIENTE_PREPARACION, "Salida de grupo");
     }
 
-    public long calcularDevolucionCancelacion(Reserva reserva) {
-        long pagado = reserva.getFolio().calcularTotalPagado();
-        long diasAntelacion = ChronoUnit.DAYS.between(LocalDate.now(), reserva.getFechaEntrada());
-
-        if (diasAntelacion > 7) {
-            return pagado; // Devuelve 100% de lo pagado
-        } else if (diasAntelacion >= 2) {
-            long retencion = Math.round(reserva.getValorEstanciaCongelado() * 0.50);
-            return Math.max(0, pagado - retencion);
-        } else {
-            return 0L; // Retiene el 100%
+    public void declararNoShow(Reserva reserva) {
+        if (reserva.getEstado() != EstadoReserva.CONFIRMADA) {
+            throw new IllegalStateException("Solo se puede declarar No-Show sobre una reserva CONFIRMADA.");
         }
+        reserva.liquidarCancelacionONoShow(reserva.getFechaEntrada(), true);
+        reserva.cambiarEstado(EstadoReserva.NO_SHOW, "No llegó antes de las 10:00 p. m.");
     }
 
-    public long cancelarReserva(Reserva reserva) {
-        long devolucion = calcularDevolucionCancelacion(reserva);
-        if (!reserva.cambiarEstado(EstadoReserva.CANCELADA)) {
-            throw new IllegalStateException("No se puede cancelar una reserva en estado " + reserva.getEstado());
+    public void cancelarReserva(Reserva reserva) {
+        if (reserva.getEstado() != EstadoReserva.PENDIENTE && reserva.getEstado() != EstadoReserva.CONFIRMADA) {
+            throw new IllegalStateException("Solo se pueden cancelar reservas PENDIENTES o CONFIRMADAS.");
         }
-        if (devolucion > 0) {
-            reserva.getFolio().agregarCargo("Devolución por cancelación", devolucion);
-        }
-        return devolucion;
+        reserva.liquidarCancelacionONoShow(LocalDate.now(), false);
+        reserva.cambiarEstado(EstadoReserva.CANCELADA, "Cancelada por el usuario");
     }
 
-    public void verificarVencimiento24Horas() {
-        LocalDateTime limite = LocalDateTime.now().minusHours(24);
-        for (Reserva r : reservas) {
-            if (r.getEstado() == EstadoReserva.PENDIENTE && r.getFechaCreacion().isBefore(limite)) {
-                r.cambiarEstado(EstadoReserva.CANCELADA);
-            }
-        }
-    }
+    public String generarReporteGeneral() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("=== REPORTE GERENCIAL DEL ALOJAMIENTO ===\n");
+        long recaudado = reservas.stream().mapToLong(r -> r.getFolio().calcularTotalPagos()).sum();
+        long comisiones = reservas.stream()
+                .filter(r -> r.getEstado() != EstadoReserva.CANCELADA)
+                .mapToLong(Reserva::calcularComisionPlataforma).sum();
+        long saldosPendientes = reservas.stream()
+                .filter(r -> r.getEstado().esActiva())
+                .mapToLong(r -> Math.max(0L, r.getFolio().calcularSaldoPendiente())).sum();
 
-    public Usuario login(String correo, String password) {
-        return usuarios.stream().filter(u -> u.autenticar(correo, password)).findFirst().orElse(null);
+        sb.append("Total Recaudado: $").append(recaudado)
+                .append(" | Comisiones Canal Externo (15%): $").append(comisiones)
+                .append(" | Saldos Pendientes: $").append(saldosPendientes).append("\n\n");
+
+        sb.append("Reservas totales: ").append(reservas.size()).append("\n");
+        for (CanalReserva c : CanalReserva.values()) {
+            long count = reservas.stream().filter(r -> r.getCanal() == c).count();
+            sb.append(" - Canal ").append(c).append(": ").append(count).append("\n");
+        }
+        if (!conflictosCanalExterno.isEmpty()) {
+            sb.append("\nConflictos de Canal Externo:\n");
+            conflictosCanalExterno.forEach(c -> sb.append(" * ").append(c).append("\n"));
+        }
+        return sb.toString();
     }
 
     public List<Apartamento> getApartamentos() { return apartamentos; }
+    public List<Huesped> getHuespedes() { return huespedes; }
+    public List<Empleado> getEmpleados() { return empleados; }
     public List<Reserva> getReservas() { return reservas; }
-    public List<Usuario> getUsuarios() { return usuarios; }
+    public List<String> getConflictosCanalExterno() { return conflictosCanalExterno; }
 }
