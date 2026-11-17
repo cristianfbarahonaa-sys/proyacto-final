@@ -139,7 +139,7 @@ public class Reserva implements Cotizable, gestionableEstado<EstadoReserva> {
     public EstadoReserva getEstado() { return estado; }
     public Folio getFolio() { return folio; }
     public long getValorDevolucionRegistrada() { return valorDevolucionRegistrada; }
-
+//arreglo
     @Override
     public String toString() {
         return codigo + " | " + canal + " | Apto: " + apartamento.getCodigo() +
