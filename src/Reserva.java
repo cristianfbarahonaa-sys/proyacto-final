@@ -17,7 +17,6 @@ public class Reserva implements Cotizable, gestionableEstado<EstadoReserva> {
     private final LocalDateTime fechaCreacion;
     private EstadoReserva estado;
     private final Folio folio;
-
     private final long valorEstanciaCongelado;
     private final String desgloseNochesCongelado;
     private long valorDevolucionRegistrada;
